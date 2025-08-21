@@ -155,6 +155,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'users.pagination.StandardResultsSetPagination',
     'PAGE_SIZE': 10,
+    'EXCEPTION_HANDLER': 'users.exceptions.custom_exception_handler',
 }
 
 # Simple JWT
