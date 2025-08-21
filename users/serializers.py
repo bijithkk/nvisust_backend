@@ -22,10 +22,24 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "first_name", "last_name", "password", "role"]
+        extra_kwargs = {
+            "username": {"required": False, "allow_blank": True, "validators": []},
+        }
 
     def validate_password(self, value: str) -> str:
         validate_password(value)
         return value
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        email = attrs.get('email')
+        if email:
+            email_lower = email.lower()
+            if User.objects.filter(email__iexact=email_lower).exists():
+                raise serializers.ValidationError({
+                    'email': 'Email already in use'
+                })
+            attrs['email'] = email_lower
+        return attrs
 
     def create(self, validated_data: dict[str, Any]) -> User:
         password = validated_data.pop("password")
@@ -69,6 +83,24 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["username", "email", "first_name", "last_name", "role", "password"]
+        extra_kwargs = {
+            "username": {"required": False, "allow_blank": True, "validators": []},
+        }
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        email = attrs.get('email')
+        if email:
+            email_lower = email.lower()
+            # Exclude current instance when checking for duplicates
+            qs = User.objects.filter(email__iexact=email_lower)
+            if self.instance is not None:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({
+                    'email': 'Email already in use'
+                })
+            attrs['email'] = email_lower
+        return attrs
 
     def update(self, instance: User, validated_data: dict[str, Any]) -> User:
         password = validated_data.pop("password", None)
@@ -87,6 +119,8 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        if 'email' in attrs and isinstance(attrs['email'], str):
+            attrs['email'] = attrs['email'].lower()
         data = super().validate(attrs)
         data['user'] = {
             'id': self.user.id,
